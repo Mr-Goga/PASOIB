@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using System.IO;
+
 
 namespace СЗИ
 {
@@ -16,8 +18,12 @@ namespace СЗИ
         {
             Application.SetHighDpiMode(HighDpiMode.SystemAware);
             Application.EnableVisualStyles();
-            Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new Form1());
+            Application.SetCompatibleTextRenderingDefault(false);        
+            if (!File.Exists("DB.db"))
+            {
+                new SQLite().createDB("222222");
+            }
+                Application.Run(new Form1("222222"));
         }
     }
 }
