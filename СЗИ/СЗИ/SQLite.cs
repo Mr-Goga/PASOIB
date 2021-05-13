@@ -86,8 +86,6 @@ namespace СЗИ
 
             dbConn.Close();
             string path = Directory.GetCurrentDirectory();
-            //string path = System.Reflection.Assembly.GetExecutingAssembly().Location;
-
             string subpath = @"open";
             DirectoryInfo dirInfo = new DirectoryInfo(path);
             if (!dirInfo.Exists)

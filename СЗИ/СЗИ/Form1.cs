@@ -7,6 +7,7 @@ using System.Data.SQLite;
 using System.IO.Compression;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 
 
 
@@ -22,7 +23,7 @@ namespace СЗИ
         }
         public string _master_password;
         SQLite _SQLite = new SQLite();
-
+        ThreadWaiter _ThreadWaiter = new ThreadWaiter(1000);
         static public byte[] EncryptStringToBytes_Aes(byte[] plainText, byte[] Key, byte[] IV)
         {
             // Check arguments.
@@ -64,7 +65,6 @@ namespace СЗИ
             // Return the encrypted bytes from the memory stream.
             return encrypted;
         }
-
         static public byte[] DecryptStringFromBytes_Aes(byte[] cipherText, byte[] Key, byte[] IV)
         {
             //Check arguments.
@@ -112,395 +112,406 @@ namespace СЗИ
         }
         private bool encrypt (string path, string namefile_old)
         {
+            try
+            {                
+                // Создание datakey
+                Aes data_aes = Aes.Create();
 
-            // Создание datakey
-            Aes data_aes = Aes.Create();
-           
-            int status_extra_key=0;
-            string namefile= namefile_old + ".sec";
-            //string namefile_old= label1.Text;
-            byte[] encrypted_extrakey;
-            byte[] encrypted_extraIV;
-            //Проверяем нужно ли сменить имя, если да, меняем
-            if (checkBox4.Checked)
-            {
-                namefile=_SQLite.Hash(namefile_old)+ ".sec";        
-            }
+                int status_extra_key = 0;
+                string namefile = namefile_old + ".sec";
+                //string namefile_old= label1.Text;
+                byte[] encrypted_extrakey;
+                byte[] encrypted_extraIV;
+                //Проверяем нужно ли сменить имя, если да, меняем
+                if (checkBox4.Checked)
+                {
+                    namefile = _SQLite.Hash(namefile_old) + ".sec";
+                }
 
-            //проверка нахождения файла на флешке(директории с exe-шником)
-            if ((path.ToLower().IndexOf(Directory.GetCurrentDirectory().ToLower()) == -1)||(File.Exists(Directory.GetCurrentDirectory()+ "\\encrypted\\"+ namefile)))
-            {
-                MessageBox.Show("Невозможно зашифровать данный файл");
-                return false;
-            }
-            else
-            {
-                //Доп пароль на файл
-                if (checkBox2.Checked)
-                {   
-                    //Введение пароля для файла
-                    using (var form = new Form_auth(namefile_old))
-                    {
-                        //Создание extrakey
-                        Aes extra_aes = Aes.Create();
-                        var result = form.ShowDialog();
-                        if (result == DialogResult.OK)
-                        {
-                            string val = form.ReturnValue1;          //values preserved after close
-                            string password = val;
-                            byte[] salt1 = new byte[32];
-                            RNGCryptoServiceProvider rngCsp = new RNGCryptoServiceProvider();
-                            // Fill the array with a random value.
-                            rngCsp.GetBytes(salt1);
-                            Rfc2898DeriveBytes k1 = new Rfc2898DeriveBytes(password, salt1, 1000, HashAlgorithmName.SHA256);
-                            byte[] extra_key = new byte[32];
-                            byte[] extra_IV = new byte[16];
-                            extra_key = k1.GetBytes(32);
-
-                            //Считаем IV
-
-                            extra_aes.GenerateIV();
-                            extra_IV = extra_aes.IV;
-                            extra_aes.Key = extra_key;
-                            string password_hash = _SQLite.Hash(password);
-                            
-                            if (File.Exists("DB.db"))
-                            {
-                                SQLiteConnection dbConn = new SQLiteConnection("Data Source=DB.db; Version=3;");
-                                SQLiteCommand command;
-                                dbConn.Open();
-                                //Вносим все кроме id_DataKey
-                                command = new SQLiteCommand("INSERT INTO ExtraKey (id_DataKey, ps_hash, salt, IV) VALUES (22222 ,'" + password_hash + "', '" + _SQLite.bytetostring(salt1) + "', '" + _SQLite.bytetostring(extra_IV) + "');", dbConn);
-                                command.ExecuteNonQuery();
-                                dbConn.Close();
-                                status_extra_key = 1;
-                            }
-                            else
-                            {
-                                MessageBox.Show("Не удалось найти файл БД");
-                                return false;
-                            }
-
-
-                        }
-                        else
-                        {
-                            MessageBox.Show("Отмена шифрования");
-                            return false;
-                        }
-                        //Шифруем ключ datakey
-                        encrypted_extrakey = EncryptStringToBytes_Aes(data_aes.Key, extra_aes.Key, extra_aes.IV);
-                        encrypted_extraIV = EncryptStringToBytes_Aes(data_aes.IV, extra_aes.Key, extra_aes.IV);
-                    }
-                  
+                //проверка нахождения файла на флешке(директории с exe-шником)
+                if ((path.ToLower().IndexOf(Directory.GetCurrentDirectory().ToLower()) == -1) || (File.Exists(Directory.GetCurrentDirectory() + "\\encrypted\\" + namefile)))
+                {
+                    MessageBox.Show("Невозможно зашифровать данный файл");
+                    return false;
                 }
                 else
                 {
-
-                    //Шифруем datakey masterkey
-                    Aes master_aes = Aes.Create();
-                    byte[] salt= new byte[32];
-                    if (File.Exists("DB.db"))
+                    //Доп пароль на файл
+                    if (checkBox2.Checked)
                     {
-                        SQLiteConnection dbConn = new SQLiteConnection("Data Source=DB.db; Version=3;");
-                        SQLiteCommand command;
-                        dbConn.Open();
-                        command = new SQLiteCommand("SELECT * FROM MasterKey ", dbConn);
-                        using (SQLiteDataReader reader = command.ExecuteReader())
+                        //Введение пароля для файла
+                        using (var form = new Form_auth(namefile_old))
                         {
-
-                            if (reader.HasRows) // если есть данные
+                            //Создание extrakey
+                            Aes extra_aes = Aes.Create();
+                            var result = form.ShowDialog();
+                            if (result == DialogResult.OK)
                             {
-                                while (reader.Read())   // построчно считываем данные
+                                string val = form.ReturnValue1;          //values preserved after close
+                                string password = val;
+                                byte[] salt1 = new byte[32];
+                                RNGCryptoServiceProvider rngCsp = new RNGCryptoServiceProvider();
+                                // Fill the array with a random value.
+                                rngCsp.GetBytes(salt1);
+                                Rfc2898DeriveBytes k1 = new Rfc2898DeriveBytes(password, salt1, 1000, HashAlgorithmName.SHA256);
+                                byte[] extra_key = new byte[32];
+                                byte[] extra_IV = new byte[16];
+                                extra_key = k1.GetBytes(32);
+
+                                //Считаем IV
+
+                                extra_aes.GenerateIV();
+                                extra_IV = extra_aes.IV;
+                                extra_aes.Key = extra_key;
+                                string password_hash = _SQLite.Hash(password);
+
+                                if (File.Exists("DB.db"))
                                 {
-                                    salt = _SQLite.stringtobyte(reader.GetString(2));
-                                    master_aes.IV = _SQLite.stringtobyte(reader.GetString(3));
-                                    Rfc2898DeriveBytes k1 = new Rfc2898DeriveBytes(_master_password, salt, 1000, HashAlgorithmName.SHA256);
-                                    master_aes.Key = k1.GetBytes(32);
+                                    SQLiteConnection dbConn = new SQLiteConnection("Data Source=DB.db; Version=3;");
+                                    SQLiteCommand command;
+                                    dbConn.Open();
+                                    //Вносим все кроме id_DataKey
+                                    command = new SQLiteCommand("INSERT INTO ExtraKey (id_DataKey, ps_hash, salt, IV) VALUES (22222 ,'" + password_hash + "', '" + _SQLite.bytetostring(salt1) + "', '" + _SQLite.bytetostring(extra_IV) + "');", dbConn);
+                                    command.ExecuteNonQuery();
+                                    dbConn.Close();
+                                    status_extra_key = 1;
+                                }
+                                else
+                                {
+                                    MessageBox.Show("Не удалось найти файл БД");
+                                    return false;
+                                }
 
-                                }                                
-                            }                            
+
+                            }
+                            else
+                            {
+                                MessageBox.Show("Отмена шифрования");
+                                return false;
+                            }
+                            //Шифруем ключ datakey
+                            encrypted_extrakey = EncryptStringToBytes_Aes(data_aes.Key, extra_aes.Key, extra_aes.IV);
+                            encrypted_extraIV = EncryptStringToBytes_Aes(data_aes.IV, extra_aes.Key, extra_aes.IV);
                         }
-                        
-                        dbConn.Close();
-                    }
 
-                    //Зашифровать мастер ключом дата ключ
-                    encrypted_extrakey = EncryptStringToBytes_Aes(data_aes.Key, master_aes.Key, master_aes.IV);
-                    encrypted_extraIV = EncryptStringToBytes_Aes(data_aes.IV, master_aes.Key, master_aes.IV);
-                }
-               
-                using (FileStream fstream = File.OpenRead(path))
-                {
-                    // преобразуем строку в байты
-                    byte[] array = new byte[fstream.Length];
-                    // считываем данные
-                    fstream.Read(array, 0, array.Length);
-                    //Шифрование файла
-                    
-                    // Encrypt the string to an array of bytes.
-                    byte[] encrypted = EncryptStringToBytes_Aes(array, data_aes.Key, data_aes.IV);
-                    
-                    //Создаем шифрованный файл в encrypted
-                    FileStream fstream1 = new FileStream($"{Directory.GetCurrentDirectory()}\\encrypted\\{namefile}", FileMode.OpenOrCreate);
-                    // запись массива байтов в файл
-                    fstream1.Write(encrypted, 0, encrypted.Length);
-                    if (fstream1 != null)
-                        fstream1.Close();
-                    if (fstream != null)
-                        fstream.Close();
-
-                    // Если нужно удалить исходный файл, удаляем
-                    if (checkBox3.Checked)
-                    {
-                        FileInfo fileInf = new FileInfo(path);
-                        if (fileInf.Exists)
-                        {
-                            fileInf.Delete();
-                        }
-                    }
-
-                    //Сохраняем ключи в БД
-                    if (File.Exists("DB.db"))
-                    {
-                        SQLiteConnection dbConn = new SQLiteConnection("Data Source=DB.db; Version=3;");
-                        SQLiteCommand command;
-                        dbConn.Open();
-                        //Вносим все кроме id_DataKey
-
-                        
-                        command = new SQLiteCommand("INSERT INTO DataKey (extra_key, namefile, namefile_old, key, IV) VALUES ('" + status_extra_key + "','" + namefile + "', '" + namefile_old + "', '" + _SQLite.bytetostring(encrypted_extrakey) + "', '" + _SQLite.bytetostring(encrypted_extraIV)+ "');", dbConn);
-                        command.ExecuteNonQuery();
-                        
-                        if (checkBox2.Checked)
-                        {
-                            command = new SQLiteCommand("UPDATE ExtraKey SET id_DataKey = (SELECT ID FROM DataKey WHERE namefile='" + namefile + "') WHERE id_DataKey = 22222;", dbConn);
-                            command.ExecuteNonQuery();
-                        }
-                        dbConn.Close();
                     }
                     else
                     {
-                        MessageBox.Show("Не удалось найти файл БД");
-                        return false;
+
+                        //Шифруем datakey masterkey
+                        Aes master_aes = Aes.Create();
+                        byte[] salt = new byte[32];
+                        if (File.Exists("DB.db"))
+                        {
+                            SQLiteConnection dbConn = new SQLiteConnection("Data Source=DB.db; Version=3;");
+                            SQLiteCommand command;
+                            dbConn.Open();
+                            command = new SQLiteCommand("SELECT * FROM MasterKey ", dbConn);
+                            using (SQLiteDataReader reader = command.ExecuteReader())
+                            {
+
+                                if (reader.HasRows) // если есть данные
+                                {
+                                    while (reader.Read())   // построчно считываем данные
+                                    {
+                                        salt = _SQLite.stringtobyte(reader.GetString(2));
+                                        master_aes.IV = _SQLite.stringtobyte(reader.GetString(3));
+                                        Rfc2898DeriveBytes k1 = new Rfc2898DeriveBytes(_master_password, salt, 1000, HashAlgorithmName.SHA256);
+                                        master_aes.Key = k1.GetBytes(32);
+
+                                    }
+                                }
+                            }
+
+                            dbConn.Close();
+                        }
+
+                        //Зашифровать мастер ключом дата ключ
+                        encrypted_extrakey = EncryptStringToBytes_Aes(data_aes.Key, master_aes.Key, master_aes.IV);
+                        encrypted_extraIV = EncryptStringToBytes_Aes(data_aes.IV, master_aes.Key, master_aes.IV);
                     }
 
+                    using (FileStream fstream = File.OpenRead(path))
+                    {
+                        // преобразуем строку в байты
+                        byte[] array = new byte[fstream.Length];
+                        // считываем данные
+                        fstream.Read(array, 0, array.Length);
+                        //Шифрование файла
+
+                        // Encrypt the string to an array of bytes.
+                        byte[] encrypted = EncryptStringToBytes_Aes(array, data_aes.Key, data_aes.IV);
+
+                        //Создаем шифрованный файл в encrypted
+                        FileStream fstream1 = new FileStream($"{Directory.GetCurrentDirectory()}\\encrypted\\{namefile}", FileMode.OpenOrCreate);
+                        // запись массива байтов в файл
+                        fstream1.Write(encrypted, 0, encrypted.Length);
+                        if (fstream1 != null)
+                            fstream1.Close();
+                        if (fstream != null)
+                            fstream.Close();
+
+                        // Если нужно удалить исходный файл, удаляем
+                        if (checkBox3.Checked)
+                        {
+                            FileInfo fileInf = new FileInfo(path);
+                            if (fileInf.Exists)
+                            {
+                                fileInf.Delete();
+                            }
+                        }
+
+                        //Сохраняем ключи в БД
+                        if (File.Exists("DB.db"))
+                        {
+                            SQLiteConnection dbConn = new SQLiteConnection("Data Source=DB.db; Version=3;");
+                            SQLiteCommand command;
+                            dbConn.Open();
+                            //Вносим все кроме id_DataKey
+
+
+                            command = new SQLiteCommand("INSERT INTO DataKey (extra_key, namefile, namefile_old, key, IV) VALUES ('" + status_extra_key + "','" + namefile + "', '" + namefile_old + "', '" + _SQLite.bytetostring(encrypted_extrakey) + "', '" + _SQLite.bytetostring(encrypted_extraIV) + "');", dbConn);
+                            command.ExecuteNonQuery();
+
+                            if (checkBox2.Checked)
+                            {
+                                command = new SQLiteCommand("UPDATE ExtraKey SET id_DataKey = (SELECT ID FROM DataKey WHERE namefile='" + namefile + "') WHERE id_DataKey = 22222;", dbConn);
+                                command.ExecuteNonQuery();
+                            }
+                            dbConn.Close();
+                        }
+                        else
+                        {
+                            MessageBox.Show("Не удалось найти файл БД");
+                            return false;
+                        }
+
+                    }
+                    return true;
                 }
 
-                   
-                return true;
+            }            
+            finally
+            {
+                _ThreadWaiter.RemoveThread();
             }
-
-            
         }
         private bool decrypt(string path, string namefile)
         {
-            int id_datakey=-1;
-            int extra_key_status=-22;
-            //string namefile= label1.Text;
-            string namefile_new="error";
-            byte[] encrypted_datakey=null;
-            byte[] encrypted_dataIV = null;
-            byte[] salt = new byte[32];
-            Aes master_aes = Aes.Create();
-            Aes data_aes= Aes.Create();
-
-            //Читаем данные о файле
-            if (File.Exists("DB.db"))
+            try
             {
-                SQLiteConnection dbConn = new SQLiteConnection("Data Source=DB.db; Version=3;");
-                SQLiteCommand command;
-                dbConn.Open();
-                //Вносим все кроме id_DataKey
-                command = new SQLiteCommand("SELECT * FROM DataKey WHERE namefile ='"+namefile+ "'", dbConn);
-                using (SQLiteDataReader reader = command.ExecuteReader())
+                int id_datakey = -1;
+                int extra_key_status = -22;
+                //string namefile= label1.Text;
+                string namefile_new = "error";
+                byte[] encrypted_datakey = null;
+                byte[] encrypted_dataIV = null;
+                byte[] salt = new byte[32];
+                Aes master_aes = Aes.Create();
+                Aes data_aes = Aes.Create();
+
+                //Читаем данные о файле
+                if (File.Exists("DB.db"))
                 {
-
-                    if (reader.HasRows) // если есть данные
+                    SQLiteConnection dbConn = new SQLiteConnection("Data Source=DB.db; Version=3;");
+                    SQLiteCommand command;
+                    dbConn.Open();
+                    //Вносим все кроме id_DataKey
+                    command = new SQLiteCommand("SELECT * FROM DataKey WHERE namefile ='" + namefile + "'", dbConn);
+                    using (SQLiteDataReader reader = command.ExecuteReader())
                     {
-                        while (reader.Read())   // построчно считываем данные
-                        {
-                            id_datakey= reader.GetInt32(0);
-                            extra_key_status= reader.GetInt32(1);
-                            namefile_new = reader.GetString(3);
-                            encrypted_datakey = _SQLite.stringtobyte(reader.GetString(4));
-                            encrypted_dataIV = _SQLite.stringtobyte(reader.GetString(5));                      
 
+                        if (reader.HasRows) // если есть данные
+                        {
+                            while (reader.Read())   // построчно считываем данные
+                            {
+                                id_datakey = reader.GetInt32(0);
+                                extra_key_status = reader.GetInt32(1);
+                                namefile_new = reader.GetString(3);
+                                encrypted_datakey = _SQLite.stringtobyte(reader.GetString(4));
+                                encrypted_dataIV = _SQLite.stringtobyte(reader.GetString(5));
+
+                            }
                         }
                     }
+
+                    dbConn.Close();
                 }
 
-                dbConn.Close();
-            }
-
-            if ((path.ToLower().IndexOf(Directory.GetCurrentDirectory().ToLower()) == -1) || (File.Exists(Directory.GetCurrentDirectory() + "\\open\\" + namefile_new))||(id_datakey==-1))
-            {
-                MessageBox.Show("Невозможно расшифровать данный файл");
-                return false;
-            }
-            else
-            {
-                //Если datakey зашифрован masterkey
-                if (extra_key_status == 0)
+                if ((path.ToLower().IndexOf(Directory.GetCurrentDirectory().ToLower()) == -1) || (File.Exists(Directory.GetCurrentDirectory() + "\\open\\" + namefile_new)) || (id_datakey == -1))
                 {
-                    if (File.Exists("DB.db"))
-                    {
-                        SQLiteConnection dbConn = new SQLiteConnection("Data Source=DB.db; Version=3;");
-                        SQLiteCommand command;
-                        dbConn.Open();
-                        //Вносим все кроме id_DataKey
-                        command = new SQLiteCommand("SELECT * FROM MasterKey ", dbConn);
-                        using (SQLiteDataReader reader = command.ExecuteReader())
-                        {
-
-                            if (reader.HasRows) // если есть данные
-                            {
-                                while (reader.Read())   // построчно считываем данные
-                                {
-                                    salt = _SQLite.stringtobyte(reader.GetString(2));
-                                    master_aes.IV = _SQLite.stringtobyte(reader.GetString(3));
-                                    Rfc2898DeriveBytes k1 = new Rfc2898DeriveBytes(_master_password, salt, 1000, HashAlgorithmName.SHA256);
-                                    master_aes.Key = k1.GetBytes(32);
-
-                                }
-                            }
-                        }
-                        dbConn.Close();
-
-
-
-                    }
-
-                }
-                //Если datakey зашифрован extakey
-                else if (extra_key_status == 1)
-                {
-                    string ps_hash="";
-                    if (File.Exists("DB.db"))
-                    {
-                        SQLiteConnection dbConn = new SQLiteConnection("Data Source=DB.db; Version=3;");
-                        SQLiteCommand command;
-                        dbConn.Open();
-                        //Вносим все кроме id_DataKey
-                        command = new SQLiteCommand("SELECT * FROM ExtraKey WHERE id_DataKey='" + id_datakey + "'", dbConn);
-                        using (SQLiteDataReader reader = command.ExecuteReader())
-                        {
-
-                            if (reader.HasRows) // если есть данные
-                            {
-                                while (reader.Read())   // построчно считываем данные
-                                {
-                                    ps_hash = reader.GetString(2);
-                                    salt = _SQLite.stringtobyte(reader.GetString(3));
-                                    master_aes.IV = _SQLite.stringtobyte(reader.GetString(4));                                 
-
-                                }
-                            }
-                        }
-                        dbConn.Close();                        
-                    }
-                    //Ввод и проверка пароля
-                    using (var form = new Form_auth(namefile))
-                    {
-                        var result = form.ShowDialog();
-                        if (result == DialogResult.OK)
-                        {
-                            string val = form.ReturnValue1;          //values preserved after close
-                            string password = val;
-                            if(_SQLite.Hash(password)== ps_hash)
-                            {
-                                Rfc2898DeriveBytes k1 = new Rfc2898DeriveBytes(password, salt, 1000, HashAlgorithmName.SHA256);
-                                master_aes.Key = k1.GetBytes(32);
-                            }
-                            else
-                            {
-                                MessageBox.Show("Введен неверный пароль");
-                                return false;
-                            }
-                        }
-                    }
+                    MessageBox.Show("Невозможно расшифровать данный файл");
+                    return false;
                 }
                 else
                 {
-                    MessageBox.Show("Не удалось расшифровать datakey");
-                    return false;
-                }
-
-                // Расшифровываем datakey
-                data_aes.Key = DecryptStringFromBytes_Aes(encrypted_datakey, master_aes.Key, master_aes.IV);
-                data_aes.IV = DecryptStringFromBytes_Aes(encrypted_dataIV, master_aes.Key, master_aes.IV);
-                using (FileStream fstream = File.OpenRead(path))
-                {
-                    // преобразуем строку в байты
-                    byte[] array = new byte[fstream.Length];
-                    // считываем данные
-                    fstream.Read(array, 0, array.Length);
-                    byte[] decript = DecryptStringFromBytes_Aes(array, data_aes.Key, data_aes.IV);
-                    FileStream fstream1 = new FileStream($"{Directory.GetCurrentDirectory()}\\open\\{namefile_new}", FileMode.OpenOrCreate);
-                    // запись массива байтов в файл
-                    fstream1.Write(decript, 0, decript.Length);
-                    if (fstream1 != null)
-                        fstream1.Close();
-                    if (fstream != null)
-                        fstream.Close();
-                }
-                //Удаление зашифрованного файла
-                if (checkBox3.Checked)
-                {
-                    if (File.Exists("DB.db"))
+                    //Если datakey зашифрован masterkey
+                    if (extra_key_status == 0)
                     {
-                        SQLiteConnection dbConn = new SQLiteConnection("Data Source=DB.db; Version=3;");
-                        SQLiteCommand command;
-                        dbConn.Open();
-                        //Вносим все кроме id_DataKey
-                        command = new SQLiteCommand("DELETE  FROM ExtraKey WHERE id_DataKey = '"+ id_datakey + "'", dbConn);
-                        command.ExecuteNonQuery();
-                        command = new SQLiteCommand("DELETE  FROM DataKey WHERE id = '" + id_datakey + "'", dbConn);
-                        command.ExecuteNonQuery();
-                        FileInfo fileInf = new FileInfo(path);
-                        if (fileInf.Exists)
+                        if (File.Exists("DB.db"))
                         {
-                            fileInf.Delete();
+                            SQLiteConnection dbConn = new SQLiteConnection("Data Source=DB.db; Version=3;");
+                            SQLiteCommand command;
+                            dbConn.Open();
+                            //Вносим все кроме id_DataKey
+                            command = new SQLiteCommand("SELECT * FROM MasterKey ", dbConn);
+                            using (SQLiteDataReader reader = command.ExecuteReader())
+                            {
+
+                                if (reader.HasRows) // если есть данные
+                                {
+                                    while (reader.Read())   // построчно считываем данные
+                                    {
+                                        salt = _SQLite.stringtobyte(reader.GetString(2));
+                                        master_aes.IV = _SQLite.stringtobyte(reader.GetString(3));
+                                        Rfc2898DeriveBytes k1 = new Rfc2898DeriveBytes(_master_password, salt, 1000, HashAlgorithmName.SHA256);
+                                        master_aes.Key = k1.GetBytes(32);
+
+                                    }
+                                }
+                            }
+                            dbConn.Close();
                         }
-                        dbConn.Close();
+                    }
+                    //Если datakey зашифрован extakey
+                    else if (extra_key_status == 1)
+                    {
+                        string ps_hash = "";
+                        if (File.Exists("DB.db"))
+                        {
+                            SQLiteConnection dbConn = new SQLiteConnection("Data Source=DB.db; Version=3;");
+                            SQLiteCommand command;
+                            dbConn.Open();
+                            //Вносим все кроме id_DataKey
+                            command = new SQLiteCommand("SELECT * FROM ExtraKey WHERE id_DataKey='" + id_datakey + "'", dbConn);
+                            using (SQLiteDataReader reader = command.ExecuteReader())
+                            {
+
+                                if (reader.HasRows) // если есть данные
+                                {
+                                    while (reader.Read())   // построчно считываем данные
+                                    {
+                                        ps_hash = reader.GetString(2);
+                                        salt = _SQLite.stringtobyte(reader.GetString(3));
+                                        master_aes.IV = _SQLite.stringtobyte(reader.GetString(4));
+
+                                    }
+                                }
+                            }
+                            dbConn.Close();
+                        }
+                        //Ввод и проверка пароля
+                        using (var form = new Form_auth(namefile))
+                        {
+                            var result = form.ShowDialog();
+                            if (result == DialogResult.OK)
+                            {
+                                string val = form.ReturnValue1;          //values preserved after close
+                                string password = val;
+                                if (_SQLite.Hash(password) == ps_hash)
+                                {
+                                    Rfc2898DeriveBytes k1 = new Rfc2898DeriveBytes(password, salt, 1000, HashAlgorithmName.SHA256);
+                                    master_aes.Key = k1.GetBytes(32);
+                                }
+                                else
+                                {
+                                    MessageBox.Show("Введен неверный пароль");
+                                    return false;
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        MessageBox.Show("Не удалось расшифровать datakey");
+                        return false;
                     }
 
-                }
+                    // Расшифровываем datakey
+                    data_aes.Key = DecryptStringFromBytes_Aes(encrypted_datakey, master_aes.Key, master_aes.IV);
+                    data_aes.IV = DecryptStringFromBytes_Aes(encrypted_dataIV, master_aes.Key, master_aes.IV);
+                    using (FileStream fstream = File.OpenRead(path))
+                    {
+                        // преобразуем строку в байты
+                        byte[] array = new byte[fstream.Length];
+                        // считываем данные
+                        fstream.Read(array, 0, array.Length);
+                        byte[] decript = DecryptStringFromBytes_Aes(array, data_aes.Key, data_aes.IV);
+                        FileStream fstream1 = new FileStream($"{Directory.GetCurrentDirectory()}\\open\\{namefile_new}", FileMode.OpenOrCreate);
+                        // запись массива байтов в файл
+                        fstream1.Write(decript, 0, decript.Length);
+                        if (fstream1 != null)
+                            fstream1.Close();
+                        if (fstream != null)
+                            fstream.Close();
+                    }
+                    //Удаление зашифрованного файла
+                    if (checkBox3.Checked)
+                    {
+                        if (File.Exists("DB.db"))
+                        {
+                            SQLiteConnection dbConn = new SQLiteConnection("Data Source=DB.db; Version=3;");
+                            SQLiteCommand command;
+                            dbConn.Open();
+                            //Вносим все кроме id_DataKey
+                            command = new SQLiteCommand("DELETE  FROM ExtraKey WHERE id_DataKey = '" + id_datakey + "'", dbConn);
+                            command.ExecuteNonQuery();
+                            command = new SQLiteCommand("DELETE  FROM DataKey WHERE id = '" + id_datakey + "'", dbConn);
+                            command.ExecuteNonQuery();
+                            FileInfo fileInf = new FileInfo(path);
+                            if (fileInf.Exists)
+                            {
+                                fileInf.Delete();
+                            }
+                            dbConn.Close();
+                        }
+
+                    }
                     return true;
+                }
+            }           
+            finally
+            {
+                _ThreadWaiter.RemoveThread();
             }
-        }       
-        private async void encrypt_all()
+        }               
+        private void encrypt_catalog (string name)
+        {
+            string sourceFolder = Directory.GetCurrentDirectory() + "\\open\\" + name; // исходная папка
+            string zipFile = Directory.GetCurrentDirectory() + "\\open\\" + name + ".zip"; // сжатый файл
+            ZipFile.CreateFromDirectory(sourceFolder, zipFile);
+            encrypt(zipFile, name + ".zip");
+            FileInfo fileInf = new FileInfo(zipFile);
+            if (fileInf.Exists)
+            {
+                fileInf.Delete();
+            }
+        }
+        private void encrypt_allAsync()
         {
             DirectoryInfo dr = new DirectoryInfo(@"open");
+            
             foreach (var d in dr.GetDirectories())
             {
-                string sourceFolder = Directory.GetCurrentDirectory() +"\\open\\" + d.Name; // исходная папка
-                string zipFile = Directory.GetCurrentDirectory() + "\\open\\" + d.Name+".zip"; // сжатый файл
-                textBox1.Text = textBox1.Text + zipFile + "//////////////////";
-                ZipFile.CreateFromDirectory(sourceFolder, zipFile);           
-                await Task.Run(() => encrypt(zipFile, d.Name + ".zip"));
-                FileInfo fileInf = new FileInfo(zipFile);
-                if (fileInf.Exists)
-                {
-                    fileInf.Delete();
-                }
-
-            }
+                _ThreadWaiter.AddThreads(1);
+                Task.Run(() => encrypt_catalog(d.Name));
+            }       
             foreach (var d in dr.GetFiles())
             {
-                textBox1.Text = textBox1.Text +Directory.GetCurrentDirectory() + "\\open\\" + d.Name + "//////////////////";
-                await Task.Run(() => encrypt(Directory.GetCurrentDirectory() + "\\open\\" + d.Name, d.Name));
+                _ThreadWaiter.AddThreads(1);
+                Task.Run(() => encrypt(Directory.GetCurrentDirectory() + "\\open\\" + d.Name, d.Name));
             }
-
+          _ThreadWaiter.Wait();
         }
-        private async void decrypt_all()
+        private void decrypt_allAsync()
         {
             DirectoryInfo dr = new DirectoryInfo(@"encrypted");           
             foreach (var d in dr.GetFiles())
             {
-                await Task.Run(() => decrypt(Directory.GetCurrentDirectory() + "\\encrypted\\" + d.Name, d.Name));
+                _ThreadWaiter.AddThreads(1);
+                Task.Run(() => decrypt(Directory.GetCurrentDirectory() + "\\encrypted\\" + d.Name, d.Name));
             }
-
+            _ThreadWaiter.Wait();
         }
         private void button_Click(object sender, EventArgs e)
         {
@@ -550,7 +561,8 @@ namespace СЗИ
                 //Если шифруем всю папку open
                 if (checkBox1.Checked)
                 {
-                    encrypt_all();
+
+                    encrypt_allAsync();
                     if (checkBox3.Checked)
                     {
                         DirectoryInfo dr = new DirectoryInfo(Directory.GetCurrentDirectory() + "\\open\\");
@@ -558,8 +570,7 @@ namespace СЗИ
                         {
                             DirectoryInfo dirInfo = new DirectoryInfo(Directory.GetCurrentDirectory() + "\\open\\" + d.Name);
                             dirInfo.Delete(true);
-                        }
-                       
+                        }                       
                     }
                 }
                 //шифруем только 1 файл
@@ -573,25 +584,22 @@ namespace СЗИ
                 //Если расшифруем всю папку open
                 if (checkBox1.Checked)
                 {
-                    decrypt_all();
+                    decrypt_allAsync();
                     DirectoryInfo dr = new DirectoryInfo(@"open");
                     foreach (var d in dr.GetDirectories())
                     {
                         if (d.Name.IndexOf(".zip") != -1)
                         {
                             ZipFile.ExtractToDirectory(Directory.GetCurrentDirectory() + "\\open\\" + d.Name, Directory.GetCurrentDirectory() + "\\open");
-                        }
-                        
-                    }
-                
+                        }                        
+                    }                
                 }
                     //расшифруем только 1 файл
                     else if (label1.Text != "")
                     {
-                        decrypt(label_path.Text, label1.Text);
+                    decrypt(label_path.Text, label1.Text);
                     }
-                }
-            
+                }            
         }
 
         private void groupBox3_Enter(object sender, EventArgs e)
