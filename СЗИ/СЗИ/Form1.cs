@@ -23,53 +23,51 @@ namespace СЗИ
         public string _master_password;
         SQLite _SQLite = new SQLite();
 
-        private byte[] EncryptStringToBytes_Aes(byte[] plainText, byte[] Key, byte[] IV)
+        static public byte[] EncryptStringToBytes_Aes(byte[] plainText, byte[] Key, byte[] IV)
         {
             // Check arguments.
-           //if (plainText == null || plainText.Length <= 0)
-             //   throw new ArgumentNullException("plainText");
+            if (plainText == null || plainText.Length <= 0)
+                throw new ArgumentNullException("plainText");
             if (Key == null || Key.Length <= 0)
                 throw new ArgumentNullException("Key");
             if (IV == null || IV.Length <= 0)
                 throw new ArgumentNullException("IV");
-            byte[] encrypted;
+            byte[] encrypted = new byte[plainText.Length];
 
-            // Create an Aes object
+            // Create an AesManaged object
             // with the specified key and IV.
-            using (Aes aesAlg = Aes.Create())
+            using (AesManaged aesAlg = new AesManaged())
             {
                 aesAlg.Key = Key;
                 aesAlg.IV = IV;
+                string tmp = "";
+                char ch;
 
                 // Create an encryptor to perform the stream transform.
                 ICryptoTransform encryptor = aesAlg.CreateEncryptor(aesAlg.Key, aesAlg.IV);
 
-                // Create the streams used for encryption.
+                // Create the streams used for encryption.                
                 using (MemoryStream msEncrypt = new MemoryStream())
-
                 {
+
                     using (CryptoStream csEncrypt = new CryptoStream(msEncrypt, encryptor, CryptoStreamMode.Write))
                     {
-                        //msEncrypt.Write(plainText);
-
-                        using (StreamWriter swEncrypt = new StreamWriter(csEncrypt))
-                        {
-                           
-                            //Write all data to the stream.
-                            swEncrypt.Write(BitConverter.ToString(plainText));
-                        }
-                        encrypted = msEncrypt.ToArray();
+                        csEncrypt.Write(plainText, 0, plainText.Length);
+                        csEncrypt.Close();
                     }
+
+                    encrypted = msEncrypt.ToArray();
+                    msEncrypt.Close();
                 }
             }
 
             // Return the encrypted bytes from the memory stream.
             return encrypted;
         }
-        private byte[] DecryptStringFromBytes_Aes(byte[] cipherText, byte[] Key, byte[] IV)
+
+        static public byte[] DecryptStringFromBytes_Aes(byte[] cipherText, byte[] Key, byte[] IV)
         {
-            byte[] array=null;
-            // Check arguments.
+            //Check arguments.
             if (cipherText == null || cipherText.Length <= 0)
                 throw new ArgumentNullException("cipherText");
             if (Key == null || Key.Length <= 0)
@@ -79,15 +77,15 @@ namespace СЗИ
 
             // Declare the string used to hold
             // the decrypted text.
-            string plaintext = null;
+            byte[] buffer = new byte[4096];
+            byte[] plaintext = null;
 
-            // Create an Aes object
+            // Create an AesManaged object
             // with the specified key and IV.
-            using (Aes aesAlg = Aes.Create())
+            using (AesManaged aesAlg = new AesManaged())
             {
                 aesAlg.Key = Key;
                 aesAlg.IV = IV;
-
                 // Create a decryptor to perform the stream transform.
                 ICryptoTransform decryptor = aesAlg.CreateDecryptor(aesAlg.Key, aesAlg.IV);
 
@@ -96,24 +94,21 @@ namespace СЗИ
                 {
                     using (CryptoStream csDecrypt = new CryptoStream(msDecrypt, decryptor, CryptoStreamMode.Read))
                     {
-                        //array= msDecrypt.ToArray();
-
-                        using (StreamReader srDecrypt = new StreamReader(csDecrypt))
+                        using (MemoryStream ms = new MemoryStream())
                         {
-
-                            //Read the decrypted bytes from the decrypting stream
-                            // and place them in a string.
-                            plaintext = srDecrypt.ReadToEnd();
-                            String[] arr = plaintext.Split('-');
-                            array = new byte[arr.Length];
-                            for (int i = 0; i < arr.Length; i++) array[i] = Convert.ToByte(arr[i], 16);
+                            do
+                            {
+                                var count = csDecrypt.Read(buffer, 0, buffer.Length);
+                                if (count == 0) break;
+                                ms.Write(buffer, 0, count);
+                            } while (true);
+                            plaintext = ms.ToArray();
                         }
                     }
                 }
+
             }
-            return array;
-           // return Encoding.Unicode.GetBytes(plaintext);
-            // return _SQLite.stringtobyte(plaintext);
+            return plaintext;
         }
         private bool encrypt (string path, string namefile_old)
         {
@@ -210,7 +205,6 @@ namespace СЗИ
                         SQLiteConnection dbConn = new SQLiteConnection("Data Source=DB.db; Version=3;");
                         SQLiteCommand command;
                         dbConn.Open();
-                        //Вносим все кроме id_DataKey
                         command = new SQLiteCommand("SELECT * FROM MasterKey ", dbConn);
                         using (SQLiteDataReader reader = command.ExecuteReader())
                         {

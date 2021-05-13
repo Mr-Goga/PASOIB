@@ -32,3 +32,4 @@ C:\Users\Егор_К\Source\Repos\PASOIB\СЗИ\СЗИ\obj\Debug\net5.0-windows\
 C:\Users\Егор_К\Source\Repos\PASOIB\СЗИ\СЗИ\obj\Debug\net5.0-windows\ref\СЗИ.dll
 C:\Users\Егор_К\Source\Repos\PASOIB\СЗИ\СЗИ\obj\Debug\net5.0-windows\СЗИ.pdb
 C:\Users\Егор_К\Source\Repos\PASOIB\СЗИ\СЗИ\obj\Debug\net5.0-windows\СЗИ.genruntimeconfig.cache
+C:\Users\Егор_К\Source\Repos\PASOIB\СЗИ\СЗИ\obj\Debug\net5.0-windows\СЗИ.Form_open.resources
