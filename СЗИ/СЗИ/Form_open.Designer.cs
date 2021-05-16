@@ -61,9 +61,9 @@ namespace СЗИ
             this.label1.AutoSize = true;
             this.label1.Location = new System.Drawing.Point(29, 12);
             this.label1.Name = "label1";
-            this.label1.Size = new System.Drawing.Size(125, 15);
+            this.label1.Size = new System.Drawing.Size(111, 15);
             this.label1.TabIndex = 2;
-            this.label1.Text = "Введите мастер ключ";
+            this.label1.Text = "Введите пароль БД";
             // 
             // textBox1
             // 

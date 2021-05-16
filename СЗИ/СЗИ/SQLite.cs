@@ -1,13 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Text;
 using System.Data.SQLite;
 using System.IO;
 using System.Security.Cryptography;
-using System.Data.SQLite;
-using System.IO;
-using System.Security.Cryptography;
-
 namespace СЗИ
 {
     class SQLite

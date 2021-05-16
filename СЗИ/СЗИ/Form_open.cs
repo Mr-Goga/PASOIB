@@ -33,7 +33,7 @@ namespace СЗИ
                  _SQLite.createDB(textBox2.Text);
                 MessageBox.Show("База данных успешно создана!");
                 this.Hide();
-                var formMain = new Form1(textBox2.Text);
+                var formMain = new Form_main(textBox2.Text);
                 formMain.Closed += (s, args) => this.Close();
                 formMain.Show();
             }
@@ -59,7 +59,7 @@ namespace СЗИ
                 if(_SQLite.Hash(textBox1.Text)== hashpass)
                 {
                     this.Hide();
-                    var formMain = new Form1(textBox2.Text);
+                    var formMain = new Form_main(textBox2.Text);
                     formMain.Closed += (s, args) => this.Close();
                     formMain.Show();
                 }

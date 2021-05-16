@@ -20,7 +20,6 @@ C:\Users\Егор_К\Source\Repos\PASOIB\СЗИ\СЗИ\bin\Debug\net5.0-windows\
 C:\Users\Егор_К\Source\Repos\PASOIB\СЗИ\СЗИ\bin\Debug\net5.0-windows\runtimes\unix\lib\netcoreapp2.1\System.Data.SqlClient.dll
 C:\Users\Егор_К\Source\Repos\PASOIB\СЗИ\СЗИ\bin\Debug\net5.0-windows\runtimes\win\lib\netcoreapp2.1\System.Data.SqlClient.dll
 C:\Users\Егор_К\Source\Repos\PASOIB\СЗИ\СЗИ\obj\Debug\net5.0-windows\СЗИ.csprojAssemblyReference.cache
-C:\Users\Егор_К\Source\Repos\PASOIB\СЗИ\СЗИ\obj\Debug\net5.0-windows\СЗИ.Form1.resources
 C:\Users\Егор_К\Source\Repos\PASOIB\СЗИ\СЗИ\obj\Debug\net5.0-windows\СЗИ.Form_auth.resources
 C:\Users\Егор_К\Source\Repos\PASOIB\СЗИ\СЗИ\obj\Debug\net5.0-windows\СЗИ.csproj.GenerateResource.cache
 C:\Users\Егор_К\Source\Repos\PASOIB\СЗИ\СЗИ\obj\Debug\net5.0-windows\СЗИ.GeneratedMSBuildEditorConfig.editorconfig
@@ -33,3 +32,4 @@ C:\Users\Егор_К\Source\Repos\PASOIB\СЗИ\СЗИ\obj\Debug\net5.0-windows\
 C:\Users\Егор_К\Source\Repos\PASOIB\СЗИ\СЗИ\obj\Debug\net5.0-windows\СЗИ.pdb
 C:\Users\Егор_К\Source\Repos\PASOIB\СЗИ\СЗИ\obj\Debug\net5.0-windows\СЗИ.genruntimeconfig.cache
 C:\Users\Егор_К\Source\Repos\PASOIB\СЗИ\СЗИ\obj\Debug\net5.0-windows\СЗИ.Form_open.resources
+C:\Users\Егор_К\Source\Repos\PASOIB\СЗИ\СЗИ\obj\Debug\net5.0-windows\СЗИ.Form_main.resources
